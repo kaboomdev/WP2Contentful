@@ -1,0 +1,24 @@
+{
+  "name": "wp_contentful_migration",
+  "version": "1.0.0",
+  "description": "",
+  "main": "migration.js",
+  "scripts": {
+    "export": "node export_wp.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@contentful/rich-text-from-markdown": "^13.4.0",
+    "axios": "^0.19.2",
+    "contentful-management": "^5.21.1",
+    "dotenv": "^8.2.0",
+    "es-get-iterator": "^1.1.0",
+    "es6-iterator": "^2.0.3",
+    "get-json": "^1.0.1",
+    "lodash": "^4.17.15",
+    "make-iterator": "^2.0.0",
+    "node-fetch": "^2.6.0",
+    "turndown": "^6.0.0"
+  }
+}
