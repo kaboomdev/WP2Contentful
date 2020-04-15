@@ -30,13 +30,8 @@ async function transformPost(post) {
     fs.writeFileSync(path.resolve('./post-markdown.md'), markdown);
     let parsedContent;
     
-    try {
-        parsedContent = await richTextFromMarkdown(markdown, imgTagParse(post));
-    } catch (error) {
-        const errorComment = "Error in richTextFromMarkdown";
-        logError(post.slug, e, errorComment);
-        console.log(`${post.slug} - ${errorComment}.`);
-    }
+    parsedContent = await richTextFromMarkdown(markdown, imgTagParse(post));
+    
 
     const postData = {
         publishDate: post.publishDate,
@@ -56,7 +51,8 @@ function imgTagParse(post) {
 
     return (node) => {
         if (node.type === 'image') {
-            const url = encodeURI(node.url);
+            //Encode and remove query params
+            const url = encodeURI(node.url).split("?")[0];
             const asset = publishedAssets.find(el => el.url === url);
 
             if (asset) {
@@ -77,8 +73,8 @@ function imgTagParse(post) {
             } else {
                 const errorComment = "BodyImage was not published. URL: " + url;
                 console.log(errorComment);
-                logError(post.slug, e, errorComment);
-                return null;
+                logError(post.slug, null, errorComment);
+                
             }
         }
     }
@@ -208,15 +204,25 @@ async function migratePosts(posts, startFrom = 0) {
         console.log(`Migrating ${postIndex} of ${posts.length - 1}`);
         const post = posts[postIndex];
 
-
+        
+        let transformedPost;
+        try {
+            transformedPost = await transformPost(post);
+        } catch (e) {
+            const errorComment = "Error while transforming post";
+            logError(post.slug, e, errorComment);
+            console.log(`${errorComment} ${post.slug}`);
+            continue;
+        }
+        
+        
         let entry;
         try {
-            const transformedPost = await transformPost(post);
             entry = await migrateToContentful(environment, transformedPost);
         } catch (e) {
             const errorComment = "Error while migrating";
             logError(post.slug, e, errorComment);
-            console.log(`${errorComment} ${post.slug}e`);
+            console.log(`${errorComment} ${post.slug}`);
             continue;
         }
 

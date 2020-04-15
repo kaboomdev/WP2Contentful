@@ -11,7 +11,7 @@ const mimeTypeMap = {
   svg: 'image/svg+xml'
 };
 
-const errors = JSON.parse(fs.readFileSync(path.resolve("./logs/errors_posts.json")));
+const errors = JSON.parse(fs.readFileSync(path.resolve("./logs/errors_assets.json")));
 const publishedAssets = JSON.parse(fs.readFileSync(path.resolve("./logs/published_assets.json")));
 
 
@@ -30,11 +30,11 @@ async function init() {
       if (asset.link.includes("beta.avexstage")) {
         asset.link = asset.link.replace("beta.avexstage", "https://avexdesigns");
       }
-      await axios.options(asset.link);
+      await axios.get(asset.link);
     } catch (e) {
-      const errorComment = `Error in ${asset.title}, skipping.`;
+      const errorComment = `Error in ${asset.link}, skipping.`;
       console.error(errorComment);
-      logError(asset, e.response.status, errorComment);
+      logError(asset, e, errorComment);
       continue;
     }
 
@@ -43,7 +43,7 @@ async function init() {
     //Save the id from contentful and the encoded url to reference later
     publishedAssets.push({
       sysId: publishedAsset.sys.id,
-      url: publishedAsset.wpAsset.url
+      url: publishedAsset.wpAsset.url,
     })
   }
   fs.writeFileSync(path.resolve('./logs/published_assets.json'), JSON.stringify(publishedAssets));
@@ -55,10 +55,13 @@ async function createAndPublishSingleAsset(asset) {
   const space = await client.getSpace(process.env.SPACE_ID)
   return new Promise(async (resolve) => {
     let cmsAsset;
-    const url = encodeURI(asset.link);
+
+    //Encode and remove query params
+    const url = encodeURI(asset.link).split("?")[0];
     asset.url = url;
-    const extension = asset.link.match(/\.(jpg|jpeg|png|gif|svg)$/)[1];
-    const fileName = asset.link.match(/\/([^\/]+)$/)[1];
+
+    const extension = url.match(/\.(jpg|jpeg|png|gif|svg)$/)[1];
+    const fileName = url.match(/\/([^\/]+)$/)[1];
     try {
       cmsAsset = await space.createAsset({
         fields: {
@@ -78,33 +81,43 @@ async function createAndPublishSingleAsset(asset) {
         }
       })
     } catch (e) {
-      console.log(e)
-      console.log(`Error! Asset "${asset.title}" failed to create.`)
+      const errorComment = `Error! Asset "${asset.link}" failed to create.`;
+      console.error(errorComment);
+      logError(asset, e, errorComment);
     }
 
     try {
       const processedCMSAsset = await cmsAsset.processForLocale(locale, { processingCheckWait: 2000 });
       const publishedCMSAsset = await processedCMSAsset.publish()
 
+
       // Save mapping information
       publishedCMSAsset.wpAsset = asset;
-      console.log(`Published asset ${asset.title}`);
+      console.log(`Published asset ${asset.link}`);
+      
+      //Contentful timeout workaround
+      await timeout(2000);
       resolve(publishedCMSAsset);
     } catch (e) {
-      console.log(`Error! Asset "${asset.title}" failed to process and publish.`)
+      const errorComment = `Error! Asset "${asset.link}" failed to process and publish..`;
+      console.error(errorComment);
+      logError(asset, e, errorComment);
     }
   })
 };
 
 function logError(asset, error, comment) {
   const errObj = {
-      identifier: {
-        url: asset.link,
-        postId: asset.postId
-      },
-      comment: comment,
-      body: error,
+    identifier: {
+      url: asset.link,
+      postId: asset.postId
+    },
+    comment: comment,
+    body: error,
   };
   errors.push(errObj);
 }
 
+function timeout(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
